@@ -391,13 +391,13 @@ process.on('unhandledRejection', function (err) {
 });
 
 // --- AUTO-PING (KEEP-ALIVE INTERNE) ---
-// Ping sa propre URL Render toutes les 5 minutes pour tromper la mise en veille automatique
+// Ping sa propre URL Render toutes les 10 secondes pour tromper la mise en veille automatique
 const RENDER_URL = "https://josihackbot.onrender.com"; 
 setInterval(async () => {
     try {
-        const res = await fetch(RENDER_URL);
-        console.log(`[AUTO-PING] Bot auto-réveillé ! Statut HTTP: ${res.status}`);
+        await fetch(RENDER_URL);
+        // Le log de succès a été masqué pour éviter le spam toutes les 10s
     } catch (err) {
         console.log(`[AUTO-PING] Échec du ping interne: ${err.message}`);
     }
-}, 5 * 60 * 1000); // 5 minutes
+}, 10 * 1000); // 10 secondes
