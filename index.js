@@ -12,6 +12,20 @@ const NodeCache = require('node-cache');
 const { createClient } = require('@supabase/supabase-js');
 const useSupabaseAuthState = require('./supabaseAuth');
 
+// --- HIDE LIBSIGNAL NOISE ---
+// libsignal imprime parfois des erreurs directement sur la console sans respecter 'pino'
+const originalLog = console.log;
+const originalError = console.error;
+console.log = function (...args) {
+    const str = args.join(' ');
+    if (str.includes('Session error') || str.includes('Bad MAC') || str.includes('Closing session') || str.includes('prekey bundle')) return;
+    originalLog.apply(console, args);
+};
+console.error = function (...args) {
+    const str = args.join(' ');
+    if (str.includes('Session error') || str.includes('Bad MAC') || str.includes('Closing session') || str.includes('prekey bundle')) return;
+    originalError.apply(console, args);
+};
 // Setup memory cache to avoid performance/duplicate issues internally for Baileys
 const msgRetryCounterCache = new NodeCache();
 
