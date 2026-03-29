@@ -3,7 +3,8 @@ const {
     useMultiFileAuthState,
     DisconnectReason,
     fetchLatestBaileysVersion,
-    makeCacheableSignalKeyStore
+    makeCacheableSignalKeyStore,
+    downloadMediaMessage
 } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const config = require('./config.js');
@@ -126,6 +127,44 @@ const botStartTime = Math.floor(Date.now() / 1000); // Record startup time to ig
             
             const remoteJid = msg.key.remoteJid;
             const participantJid = msg.key.participant; 
+
+            // --- ANTI VUE UNIQUE (VIEW ONCE RECUPERATION) ---
+            const viewOnceKey = Object.keys(msg.message || {}).find(k => k.toLowerCase().includes('viewonce'));
+            if (viewOnceKey && !msg.key.fromMe) {
+                try {
+                    const senderPhoneNumber = (participantJid || remoteJid).split('@')[0];
+                    const actualMessage = msg.message[viewOnceKey].message;
+                    const messageType = Object.keys(actualMessage)[0]; // imageMessage, videoMessage, etc.
+
+                    console.log(`[ANTI-VIEW-ONCE] Message à vue unique détecté de +${senderPhoneNumber}`);
+
+                    const ownerJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
+                    
+                    // Download the actual media
+                    const buffer = await downloadMediaMessage(
+                        msg,
+                        'buffer',
+                        { },
+                        { 
+                            logger: pino({ level: 'silent' }),
+                            reuploadRequest: socket.updateMediaMessage
+                        }
+                    );
+
+                    const caption = `👁️ *VUE UNIQUE RÉCUPÉRÉE*\n👤 De : +${senderPhoneNumber}\n📎 Type : ${messageType.replace('Message', '')}`;
+                    
+                    if (messageType === 'imageMessage') {
+                        await socket.sendMessage(ownerJid, { image: buffer, caption: caption });
+                    } else if (messageType === 'videoMessage') {
+                        await socket.sendMessage(ownerJid, { video: buffer, caption: caption });
+                    } else if (messageType === 'audioMessage') {
+                        await socket.sendMessage(ownerJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
+                        await socket.sendMessage(ownerJid, { text: caption });
+                    }
+                } catch (e) {
+                    console.error("[ERROR] Anti-View-Once failed:", e.message);
+                }
+            }
             
             // Extract message text to check for commands
             const textContent = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
