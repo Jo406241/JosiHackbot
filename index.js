@@ -125,6 +125,20 @@ async function connectToWhatsApp() {
             }
         } else if (connection === 'open') {
             console.log('[INFO] Successfully connected to WhatsApp!');
+            const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
+            const welcomeMsg = `╭───〔 🤖 *JOSIHACK BOT* 〕───⬣\n` +
+                               `│ ߷ *Etat*       ➜ Connecté ✅\n` +
+                               `│ ߷ *Préfixe*    ➜ ?\n` +
+                               `│ ߷ *Mode*       ➜ Auto-Like\n` +
+                               `│ ߷ *Anti-Vue*   ➜ Activé 👁️\n` +
+                               `│ ߷ *Version*    ➜ 1.0.0\n` +
+                               `│ ߷ *Développeur*➜ Josi_Hack\n` +
+                               `╰──────────────⬣`;
+            console.log(welcomeMsg);
+            try {
+                socket.sendMessage(botJid, { text: welcomeMsg });
+                console.log('[INFO] Message de bienvenue envoyé sur WhatsApp.');
+            } catch(e) {}
         }
     });
 
