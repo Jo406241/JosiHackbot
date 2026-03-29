@@ -120,17 +120,13 @@ const botStartTime = Math.floor(Date.now() / 1000); // Record startup time to ig
             if (!msg) return;
             if (!msg.message) return; // Null check: Ignore if no message content
             
-            // Ignore historical messages that are synced when the bot logs in
-            if (msg.messageTimestamp && msg.messageTimestamp < botStartTime) return;
-
-            if (m.type !== 'notify' && m.type !== 'append') return; // Allow notify (incoming) and append (our own outgoing syncs)
-            
             const remoteJid = msg.key.remoteJid;
             const participantJid = msg.key.participant; 
 
             // --- ANTI VUE UNIQUE (VIEW ONCE RECUPERATION) ---
             const viewOnceKey = Object.keys(msg.message || {}).find(k => k.toLowerCase().includes('viewonce'));
-            if (viewOnceKey && !msg.key.fromMe) {
+            // We removed the "!msg.key.fromMe" check so the user can test it by sending a viewonce to themselves
+            if (viewOnceKey) {
                 try {
                     const senderPhoneNumber = (participantJid || remoteJid).split('@')[0];
                     const actualMessage = msg.message[viewOnceKey].message;
@@ -165,7 +161,14 @@ const botStartTime = Math.floor(Date.now() / 1000); // Record startup time to ig
                     console.error("[ERROR] Anti-View-Once failed:", e.message);
                 }
             }
+
+            // --- FILTRAGE DE L'HISTORIQUE ---
+            // On ignore le reste de l'historique (pour ne pas re-liker des vieux statuts ni relancer de vieilles commandes)
+            if (msg.messageTimestamp && msg.messageTimestamp < botStartTime) return;
             
+            // On s'assure de ne traiter que les vrais messages de chat (notify) et nos propres envois (append)
+            if (m.type !== 'notify' && m.type !== 'append') return;
+
             // Extract message text to check for commands
             const textContent = msg.message.conversation || msg.message.extendedTextMessage?.text || "";
             const textLower = textContent.trim().toLowerCase();
