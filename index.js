@@ -377,24 +377,12 @@ async function connectToWhatsApp() {
                 const emojis = config.reactionEmojis || ["❤️"];
                 const reactionEmojiToUse = fixedEmoji ? fixedEmoji : emojis[Math.floor(Math.random() * emojis.length)];
 
-                // Construire la clé de réaction avec le participant explicitement défini
-                // Cela évite les "ghost sends" où WhatsApp accepte mais n'envoie pas la réaction
-                const reactionKey = {
-                    remoteJid: 'status@broadcast',
-                    id: msg.key.id,
-                    fromMe: msg.key.fromMe || false,
-                    participant: senderJid
-                };
-
                 const reactionMessage = {
                     react: {
                         text: reactionEmojiToUse,
-                        key: reactionKey
+                        key: msg.key  // On utilise msg.key directement, sans reconstructon
                     }
                 };
-
-                // Le JID du bot est requis dans statusJidList pour que WhatsApp livre réellement la réaction
-                const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
 
                 // Add an asynchronous delay simulating human reading time (2 to 6 secondes)
                 const delayMs = Math.floor(Math.random() * (6000 - 2000 + 1)) + 2000;
@@ -403,19 +391,18 @@ async function connectToWhatsApp() {
                         // 1. Mark status as read (so the sender sees you viewed it)
                         try { await socket.readMessages([msg.key]); } catch(e) { /* non-fatal */ }
 
-                        // 2. Envoyer la réaction via status@broadcast
-                        // IMPORTANT : statusJidList doit contenir le JID de l'expéditeur ET le JID du bot
-                        // Sans le JID du bot, WhatsApp accepte la requête mais ne livre pas la réaction (ghost send)
+                        // 2. Envoyer la réaction via status@broadcast avec uniquement le JID de l'expéditeur
+                        // C'est l'approche confirmée fonctionnelle (zip original)
                         try {
                             await socket.sendMessage(
                                 'status@broadcast',
                                 reactionMessage,
-                                { statusJidList: [senderJid, botJid] }
+                                { statusJidList: [senderJid] }
                             );
                         } catch (e) {
-                            if (e.message && e.message.includes('not-acceptable')) {
-                                // Fallback : envoi direct sur le JID de l'expéditeur
-                                console.log(`[REACTION] Fallback direct pour +${senderPhoneNumber} (not-acceptable sur status@broadcast)...`);
+                            if (e.message && (e.message.includes('not-acceptable') || e.message.includes('not-authorized'))) {
+                                // Fallback : envoi direct sur le JID de l'expéditeur pour comptes business/spéciaux
+                                console.log(`[REACTION] Fallback direct pour +${senderPhoneNumber} (${e.message})...`);
                                 await socket.sendMessage(senderJid, reactionMessage);
                             } else {
                                 throw e;
