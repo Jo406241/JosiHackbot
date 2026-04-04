@@ -241,7 +241,8 @@ async function connectToWhatsApp() {
                 // --- DOWNLOADER COMMANDS ---
                 const vCommands = ['?vv', '?vv2', '?ok'];
                 if (vCommands.includes(textLower)) {
-                    const quoted = msg.message.extendedTextMessage?.contextInfo?.quotedMessage;
+                    const contextInfo = msg.message.extendedTextMessage?.contextInfo;
+                    const quoted = contextInfo?.quotedMessage;
                     if (!quoted) return await socket.sendMessage(remoteJid, { text: "❌ Répondez à une Vue Unique." }, { quoted: msg });
 
                     let mediaMsg = quoted;
@@ -251,8 +252,22 @@ async function connectToWhatsApp() {
                         type = Object.keys(mediaMsg)[0];
                     }
 
+                    // Reconstruire un faux message compatible Baileys
+                    const fakeMsg = {
+                        key: {
+                            remoteJid: remoteJid,
+                            id: contextInfo.stanzaId,
+                            participant: contextInfo.participant || null
+                        },
+                        message: mediaMsg
+                    };
+
                     try {
-                        const buffer = await downloadMediaMessage({ message: mediaMsg }, 'buffer', {}, { logger: pino({ level: 'silent' }), reuploadRequest: socket.updateMediaMessage });
+                        const buffer = await downloadMediaMessage(
+                            fakeMsg, 
+                            'buffer', {},
+                            { logger: pino({ level: 'silent' }) }
+                        );
                         const ownerJid = config.ownerNumber + '@s.whatsapp.net';
                         const botJid = socket.user.id.split(':')[0] + '@s.whatsapp.net';
 
@@ -263,7 +278,10 @@ async function connectToWhatsApp() {
                         if (type === 'imageMessage') await socket.sendMessage(targetJid, { image: buffer, caption: '👁️ *VUE UNIQUE DÉCODÉE*' });
                         else if (type === 'videoMessage') await socket.sendMessage(targetJid, { video: buffer, caption: '👁️ *VUE UNIQUE DÉCODÉE*' });
                         else if (type === 'audioMessage') await socket.sendMessage(targetJid, { audio: buffer, mimetype: 'audio/mpeg', ptt: true });
-                    } catch (e) { await socket.sendMessage(remoteJid, { text: "❌ Erreur de téléchargement." }, { quoted: msg }); }
+                    } catch (e) {
+                        console.error("[ERROR] Download failed:", e.message);
+                        await socket.sendMessage(remoteJid, { text: "❌ Erreur de téléchargement." }, { quoted: msg });
+                    }
                 }
             }
 
